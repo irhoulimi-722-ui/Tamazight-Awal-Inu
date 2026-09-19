@@ -1,648 +1,135 @@
-import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
+import 'dart:math';
 
 void main() {
-  runApp(const AmazighLearnApp());
+  runApp(const AmazighApp());
 }
 
-class AmazighLearnApp extends StatelessWidget {
-  const AmazighLearnApp({super.key});
+class AmazighApp extends StatelessWidget {
+  const AmazighApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ⴰⵎⴰⵣⵉⵖ Learn - Amazigh Learn',
+      title: 'Tamazight Awal Inu',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.teal,
-        fontFamily: 'Roboto',
-        useMaterial3: true,
+        scaffoldBackgroundColor: Colors.teal.shade50,
+        fontFamily: 'Arial',
       ),
-      home: const AlphabetSectionScreen(),
+      home: const LevelsScreen(),
     );
   }
 }
 
 // ==========================================
-// 1. DATA MODELS & IRCAM 31 ALPHABET DATA
+// 1. البيانات (الحروف والمستويات والكلمات)
 // ==========================================
 
-class LetterModel {
-  final String symbol; // Tifinagh Symbol
-  final String name; // Name / Sound
-  final String exampleWord; // Word with letter
-  final String wordMeaning; // Word meaning in Arabic
-  final List<Offset> pathPoints; // Normalized path points for stroke animation
-
-  LetterModel({
-    required this.symbol,
-    required this.name,
-    required this.exampleWord,
-    required this.wordMeaning,
-    required this.pathPoints,
-  });
-}
-
-class LevelModel {
-  final int levelNumber;
-  final List<LetterModel> letters;
-  bool isUnlocked;
-
-  LevelModel({
-    required this.levelNumber,
-    required this.letters,
-    this.isUnlocked = false,
-  });
-}
-
-// Master pool of distractor words that don't contain targeted letters
-const List<Map<String, String>> masterWordPool = [
-  {'word': 'ⵜⵉⵜⵜ', 'meaning': 'عين'},
-  {'word': 'ⵢⵓⵍ', 'meaning': 'قمر'},
-  {'word': 'ⵉⵎⵉ', 'meaning': 'فم'},
-  {'word': 'ⴰⴷⵔⴰⵔ', 'meaning': 'جبل'},
-  {'word': 'ⵜⴰⴳⵯⵔⵜ', 'meaning': 'باب'},
-  {'word': 'ⴰⴹⴰⵕ', 'meaning': 'قدم'},
-  {'word': 'ⵜⴰⴳⴰⵏⵜ', 'meaning': 'غابة'},
-  {'word': 'ⵜⵉⵖⵔⵎⵜ', 'meaning': 'قلعة'},
-  {'word': 'ⵜⴰⵙⴳⴰ', 'meaning': 'جهة'},
-  {'word': 'ⵜⵉⵎⵉⵣⴰⵔ', 'meaning': 'بلاد'},
-  {'word': 'ⴰⵙⵉⴼ', 'meaning': 'نهر'},
+final List<String> tifinaghLetters = [
+  'ⴰ', 'ⴱ', 'ⵛ', 'ⴷ', 'ⴹ', 'ⴻ', 'ⴼ', 'ⴳ', 'ⴳⵯ', 'ⵀ', 'ⵃ', 'ⵉ', 'ⵊ', 'ⴽ', 'ⴽⵯ',
+  'ⵍ', 'ⵎ', 'ⵏ', 'ⵓ', 'ⵇ', 'ⵖ', 'ⵔ', 'ⵕ', 'ⵙ', 'ⵚ', 'ⵜ', 'ⵟ', 'ⵡ', 'ⵅ', 'ⵢ', 'ⵣ', 'ⵥ'
 ];
 
-// Helper to standard IRCAM 31 Tifinagh letters
-List<LevelModel> generateIrcamLevels() {
-  final List<LetterModel> all31Letters = [
-    // Level 1
-    LetterModel(
-      symbol: 'ⴰ',
-      name: 'Yaf (أ)',
-      exampleWord: 'ⴰⵎⴰⵏ',
-      wordMeaning: 'ماء',
-      pathPoints: const [
-        Offset(0.2, 0.8),
-        Offset(0.5, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.35, 0.55),
-        Offset(0.65, 0.55),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⴱ',
-      name: 'Yab (ب)',
-      exampleWord: 'ⴱⴰⴱⴰ',
-      wordMeaning: 'أبي',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.8),
-        Offset(0.8, 0.2),
-        Offset(0.2, 0.2),
-      ],
-    ),
-    // Level 2
-    LetterModel(
-      symbol: 'ⴳ',
-      name: 'Yag (ج/گ)',
-      exampleWord: 'ⴳⴰⴷⵉⵔ',
-      wordMeaning: 'سور',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.5, 0.2),
-        Offset(0.5, 0.8),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⴳⵯ',
-      name: 'Yagw (گو)',
-      exampleWord: 'ⵜⴰⴳⵯⵔⵜ',
-      wordMeaning: 'باب',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.6, 0.2),
-        Offset(0.4, 0.2),
-        Offset(0.4, 0.8),
-        Offset(0.8, 0.5),
-      ],
-    ),
-    // Level 3
-    LetterModel(
-      symbol: 'ⴷ',
-      name: 'Yad (د)',
-      exampleWord: 'ⴷⴰⴷⴰ',
-      wordMeaning: 'أخ أكبر',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.2, 0.8),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⴹ',
-      name: 'Yaḍ (ض)',
-      exampleWord: 'ⴰⴹⴰⵕ',
-      wordMeaning: 'رجل/قدم',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.2, 0.8),
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.8),
-      ],
-    ),
-    // Level 4
-    LetterModel(
-      symbol: 'ⴻ',
-      name: 'Yey (أصغر)',
-      exampleWord: 'ⴻⵍⵍⵉ',
-      wordMeaning: 'ابنتي',
-      pathPoints: const [
-        Offset(0.5, 0.3),
-        Offset(0.5, 0.7),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⴼ',
-      name: 'Yaf (ف)',
-      exampleWord: 'ⴼⵓⵙ',
-      wordMeaning: 'يد',
-      pathPoints: const [
-        Offset(0.5, 0.2),
-        Offset(0.5, 0.8),
-        Offset(0.2, 0.5),
-        Offset(0.8, 0.5),
-      ],
-    ),
-    // Level 5
-    LetterModel(
-      symbol: 'ⴽ',
-      name: 'Yak (ك)',
-      exampleWord: 'ⴽⵜⴰⴱ',
-      wordMeaning: 'كتاب',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.8, 0.2),
-        Offset(0.2, 0.8),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⴽⵯ',
-      name: 'Yakw (كو)',
-      exampleWord: 'ⴽⵯⵜⵉ',
-      wordMeaning: 'تذكر',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.7, 0.7),
-        Offset(0.7, 0.2),
-        Offset(0.2, 0.7),
-        Offset(0.8, 0.5),
-      ],
-    ),
-    // Level 6
-    LetterModel(
-      symbol: 'ⵀ',
-      name: 'Yah (هـ)',
-      exampleWord: 'ⵀⴰⵜⵉ',
-      wordMeaning: 'ها هو',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.8),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵃ',
-      name: 'Yaḥ (ح)',
-      exampleWord: 'ⵃⴰⴷⴰ',
-      wordMeaning: 'قرب',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.5, 0.5),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.2),
-      ],
-    ),
-    // Level 7
-    LetterModel(
-      symbol: 'ⵄ',
-      name: 'Yaʿ (ع)',
-      exampleWord: 'ⵄⴰⵔⵉ',
-      wordMeaning: 'جبل',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.2, 0.8),
-        Offset(0.5, 0.2),
-        Offset(0.5, 0.8),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵅ',
-      name: 'Yakh (خ)',
-      exampleWord: 'ⵅⴰⵍⵉ',
-      wordMeaning: 'خالي',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.2),
-      ],
-    ),
-    // Level 8
-    LetterModel(
-      symbol: 'ⵇ',
-      name: 'Yaq (ق)',
-      exampleWord: 'ⵇⴰⵔⵉ',
-      wordMeaning: 'اقرأ',
-      pathPoints: const [
-        Offset(0.3, 0.3),
-        Offset(0.7, 0.3),
-        Offset(0.7, 0.7),
-        Offset(0.3, 0.7),
-        Offset(0.3, 0.3),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵉ',
-      name: 'Yi (ي)',
-      exampleWord: 'ⵉⵎⵉ',
-      wordMeaning: 'فم',
-      pathPoints: const [
-        Offset(0.2, 0.5),
-        Offset(0.8, 0.5),
-        Offset(0.5, 0.2),
-        Offset(0.5, 0.8),
-      ],
-    ),
-    // Level 9
-    LetterModel(
-      symbol: 'ⵊ',
-      name: 'Yaj (ج)',
-      exampleWord: 'ⵊⵊⵉ',
-      wordMeaning: 'شفاء',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.5, 0.2),
-        Offset(0.5, 0.8),
-        Offset(0.2, 0.8),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵍ',
-      name: 'Yal (ل)',
-      exampleWord: 'ⵍⴰⵥ',
-      wordMeaning: 'جوع',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.8),
-      ],
-    ),
-    // Level 10
-    LetterModel(
-      symbol: 'ⵎ',
-      name: 'Yam (م)',
-      exampleWord: 'ⵎⴰⵎⴰ',
-      wordMeaning: 'أمي',
-      pathPoints: const [
-        Offset(0.2, 0.8),
-        Offset(0.2, 0.2),
-        Offset(0.5, 0.6),
-        Offset(0.8, 0.2),
-        Offset(0.8, 0.8),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵏ',
-      name: 'Yan (ن)',
-      exampleWord: 'ⵏⴽⴽⵉ',
-      wordMeaning: 'أنا',
-      pathPoints: const [
-        Offset(0.2, 0.8),
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.8, 0.2),
-      ],
-    ),
-    // Level 11
-    LetterModel(
-      symbol: 'ⵓ',
-      name: 'Yu (و/أو)',
-      exampleWord: 'ⵓⵍ',
-      wordMeaning: 'قلب',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.5, 0.8),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵔ',
-      name: 'Yar (ر)',
-      exampleWord: 'ⵔⴰⵢ',
-      wordMeaning: 'رأي',
-      pathPoints: const [
-        Offset(0.5, 0.5),
-        Offset(0.8, 0.5),
-        Offset(0.8, 0.2),
-        Offset(0.2, 0.2),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.8),
-      ],
-    ),
-    // Level 12
-    LetterModel(
-      symbol: 'ⵕ',
-      name: 'Yaṛ (ر مفخمة)',
-      exampleWord: 'ⵕⴱⴱⵉ',
-      wordMeaning: 'ربي',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.2, 0.8),
-        Offset(0.5, 0.5),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵙ',
-      name: 'Yas (س)',
-      exampleWord: 'ⵙⵉⵏ',
-      wordMeaning: 'اثنان',
-      pathPoints: const [
-        Offset(0.8, 0.2),
-        Offset(0.2, 0.2),
-        Offset(0.2, 0.5),
-        Offset(0.8, 0.5),
-        Offset(0.8, 0.8),
-        Offset(0.2, 0.8),
-      ],
-    ),
-    // Level 13
-    LetterModel(
-      symbol: 'ⵚ',
-      name: 'Yaṣ (ص)',
-      exampleWord: 'ⵚⵃⴰ',
-      wordMeaning: 'صحة',
-      pathPoints: const [
-        Offset(0.8, 0.2),
-        Offset(0.2, 0.2),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.8),
-        Offset(0.5, 0.5),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵛ',
-      name: 'Yash (ش)',
-      exampleWord: 'ⵛⵀⴰ',
-      wordMeaning: 'شهية',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.8),
-        Offset(0.5, 0.2),
-      ],
-    ),
-    // Level 14
-    LetterModel(
-      symbol: 'ⵜ',
-      name: 'Yat (ت)',
-      exampleWord: 'ⵜⵉⵜⵜ',
-      wordMeaning: 'عين',
-      pathPoints: const [
-        Offset(0.5, 0.2),
-        Offset(0.5, 0.8),
-        Offset(0.2, 0.5),
-        Offset(0.8, 0.5),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵟ',
-      name: 'Yaṭ (ط)',
-      exampleWord: 'ⵟⵟⴰⴱⵍⴰ',
-      wordMeaning: 'طاولة',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.2),
-        Offset(0.5, 0.2),
-        Offset(0.5, 0.8),
-        Offset(0.2, 0.8),
-        Offset(0.8, 0.8),
-      ],
-    ),
-    // Level 15
-    LetterModel(
-      symbol: 'ⵡ',
-      name: 'Yaw (و)',
-      exampleWord: 'ⵡⴰⵍⵓ',
-      wordMeaning: 'لا شيء',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.5, 0.8),
-        Offset(0.8, 0.2),
-      ],
-    ),
-    LetterModel(
-      symbol: 'ⵢ',
-      name: 'Yay (ي)',
-      exampleWord: 'ⵢⵓⵍ',
-      wordMeaning: 'قمر',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.5, 0.5),
-        Offset(0.8, 0.2),
-        Offset(0.5, 0.5),
-        Offset(0.5, 0.8),
-      ],
-    ),
-    // Level 16
-    LetterModel(
-      symbol: 'ⵥ',
-      name: 'Yaẓ (ز مفخمة)',
-      exampleWord: 'ⵥⴰⵕ',
-      wordMeaning: 'انظر',
-      pathPoints: const [
-        Offset(0.2, 0.2),
-        Offset(0.8, 0.8),
-        Offset(0.8, 0.2),
-        Offset(0.2, 0.8),
-        Offset(0.5, 0.2),
-        Offset(0.5, 0.8),
-      ],
-    ),
-  ];
-
-  final List<LevelModel> levels = [];
-  int levelCounter = 1;
-
-  for (int i = 0; i < all31Letters.length; i += 2) {
-    final pair = [
-      all31Letters[i],
-      if (i + 1 < all31Letters.length) all31Letters[i + 1],
-    ];
-
-    levels.add(
-      LevelModel(
-        levelNumber: levelCounter,
-        letters: pair,
-        isUnlocked: levelCounter == 1, // Level 1 unlocked by default
-      ),
-    );
-    levelCounter++;
-  }
-
-  return levels;
-}
+// قاموس مصغر لاختبار الكلمات (يجب أن يحتوي على كلمات حقيقية)
+final List<String> dictionary = [
+  'ⴰⵎⴰⵏ', 'ⴰⴼⵔⵓⵅ', 'ⵜⴰⴼⵓⴽⵜ', 'ⴰⵖⵢⵓⵍ', 'ⴰⴷⵔⴰⵔ', 'ⵉⵙⵍⵎ', 'ⴰⵖⵔⵓⵎ',
+  'ⴰⵔⴳⴰⵣ', 'ⵜⴰⵎⵖⴰⵔⵜ', 'ⴰⵖⵏⵊⴰ', 'ⵜⵉⵟⵟ', 'ⴰⴹⴰⵕ', 'ⴰⴼⵓⵙ', 'ⵉⵎⵉ',
+  'ⴰⵅⵅⴰⵎ', 'ⴰⵢⴷⵉ', 'ⴱⴰⴱⴰ', 'ⵎⴰⵎⴰ', 'ⵙⵉⵏ', 'ⴽⵔⴰⴹ'
+];
 
 // ==========================================
-// 2. MAIN ALPHABET SCREEN (LEVELS LIST)
+// 2. شاشة المستويات (16 مستوى)
 // ==========================================
-
-class AlphabetSectionScreen extends StatefulWidget {
-  const AlphabetSectionScreen({super.key});
+class LevelsScreen extends StatefulWidget {
+  const LevelsScreen({super.key});
 
   @override
-  State<AlphabetSectionScreen> createState() => _AlphabetSectionScreenState();
+  State<LevelsScreen> createState() => _LevelsScreenState();
 }
 
-class _AlphabetSectionScreenState extends State<AlphabetSectionScreen> {
-  late List<LevelModel> levels;
+class _LevelsScreenState extends State<LevelsScreen> {
+  int unlockedLevel = 1; // المستوى الأول مفتوح افتراضياً
 
-  @override
-  void initState() {
-    super.initState();
-    levels = generateIrcamLevels();
-  }
-
-  void _openLetterJourney(LetterModel letter, int levelIdx) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => InteractiveLetterJourneyScreen(
-          letter: letter,
-          onComplete: () {
-            setState(() {
-              if (levelIdx + 1 < levels.length) {
-                levels[levelIdx + 1].isUnlocked = true;
-              }
-            });
-          },
-        ),
-      ),
-    );
+  void unlockNextLevel(int currentLevel) {
+    if (currentLevel == unlockedLevel && unlockedLevel < 16) {
+      setState(() {
+        unlockedLevel++;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ⴰⴳⵎⵎⴰⵢ - الأبجدية الأمازيغية (31 حرفاً)'),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
+        title: const Text('المستويات - ⵜⵉⵙⴽⴼⴰⵍ', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.teal.shade50, Colors.orange.shade50],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
           ),
-        ),
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: levels.length,
+          itemCount: 16,
           itemBuilder: (context, index) {
-            final level = levels[index];
-            return Card(
-              elevation: 4,
-              margin: const EdgeInsets.symmetric(vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              color: level.isUnlocked ? Colors.white : Colors.grey.shade200,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'المستوى ${level.levelNumber} (ⴰⵙⵡⵉⵔ ${level.levelNumber})',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: level.isUnlocked
-                                ? Colors.teal.shade800
-                                : Colors.grey.shade600,
+            int levelNum = index + 1;
+            bool isUnlocked = levelNum <= unlockedLevel;
+            
+            // تحديد حروف المستوى (حرفين لكل مستوى، والأخير حرف واحد)
+            int letterIndex1 = index * 2;
+            int letterIndex2 = letterIndex1 + 1;
+            String levelLetters = "";
+            if (letterIndex1 < tifinaghLetters.length) {
+              levelLetters += tifinaghLetters[letterIndex1];
+            }
+            if (letterIndex2 < tifinaghLetters.length) {
+              levelLetters += " - ${tifinaghLetters[letterIndex2]}";
+            }
+
+            return GestureDetector(
+              onTap: isUnlocked
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LetterStagesScreen(
+                            levelNum: levelNum,
+                            letter1: letterIndex1 < tifinaghLetters.length ? tifinaghLetters[letterIndex1] : '',
+                            letter2: letterIndex2 < tifinaghLetters.length ? tifinaghLetters[letterIndex2] : '',
+                            onLevelComplete: () => unlockNextLevel(levelNum),
                           ),
                         ),
-                        Icon(
-                          level.isUnlocked
-                              ? Icons.lock_open_rounded
-                              : Icons.lock_rounded,
-                          color: level.isUnlocked ? Colors.green : Colors.grey,
-                          size: 28,
+                      );
+                    }
+                  : null,
+              child: Card(
+                color: isUnlocked ? Colors.white : Colors.grey.shade300,
+                elevation: isUnlocked ? 4 : 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'مستوى $levelNum',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isUnlocked ? Colors.teal : Colors.grey,
                         ),
-                      ],
-                    ),
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: level.letters.map((letter) {
-                        return ElevatedButton(
-                          onPressed: level.isUnlocked
-                              ? () => _openLetterJourney(letter, index)
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: level.isUnlocked
-                                ? Colors.orange.shade400
-                                : Colors.grey.shade400,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                letter.symbol,
-                                style: const TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                letter.name,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 8),
+                      isUnlocked
+                          ? Text(levelLetters, style: const TextStyle(fontSize: 20, color: Colors.orange))
+                          : const Icon(Icons.lock, color: Colors.grey, size: 30),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -654,642 +141,266 @@ class _AlphabetSectionScreenState extends State<AlphabetSectionScreen> {
 }
 
 // ==========================================
-// 3. THE 4-STEP INTERACTIVE LETTER JOURNEY
+// 3. شاشة المراحل الأربعة للحرف
 // ==========================================
+class LetterStagesScreen extends StatefulWidget {
+  final int levelNum;
+  final String letter1;
+  final String letter2;
+  final VoidCallback onLevelComplete;
 
-class InteractiveLetterJourneyScreen extends StatefulWidget {
-  final LetterModel letter;
-  final VoidCallback onComplete;
-
-  const InteractiveLetterJourneyScreen({
+  const LetterStagesScreen({
     super.key,
-    required this.letter,
-    required this.onComplete,
+    required this.levelNum,
+    required this.letter1,
+    required this.letter2,
+    required this.onLevelComplete,
   });
 
   @override
-  State<InteractiveLetterJourneyScreen> createState() =>
-      _InteractiveLetterJourneyScreenState();
+  State<LetterStagesScreen> createState() => _LetterStagesScreenState();
 }
 
-class _InteractiveLetterJourneyScreenState
-    extends State<InteractiveLetterJourneyScreen>
-    with SingleTickerProviderStateMixin {
-  int currentStage = 0; // 0: Listen, 1: Animated Watch, 2: Write, 3: Quiz
-
-  // Stage 1 Animation
-  late AnimationController _penAnimationController;
-
-  // Stage 2 Interactive Drawing
-  List<Offset?> userDrawingPoints = [];
-
-  // Stage 3 Quiz Options (Exactly 1 contains target letter)
-  late List<Map<String, dynamic>> quizOptions;
-  int? selectedOptionIndex;
-  bool isAnswerCorrect = false;
+class _LetterStagesScreenState extends State<LetterStagesScreen> {
+  int currentStage = 0; // 0: الاستماع, 1: المشاهدة, 2: الكتابة, 3: التقويم
+  bool isFirstLetterCompleted = false;
+  late String currentLetter;
 
   @override
   void initState() {
     super.initState();
-
-    // Pen animation setup
-    _penAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    );
-
-    _setupQuizOptions();
+    currentLetter = widget.letter1;
   }
 
-  @override
-  void dispose() {
-    _penAnimationController.dispose();
-    super.dispose();
-  }
-
-  // Generate 4 options: EXACTLY 1 correct word containing target letter!
-  void _setupQuizOptions() {
-    final String targetLetter = widget.letter.symbol;
-
-    // Filter master pool to find distractors that DO NOT contain target letter
-    List<Map<String, String>> validDistractors = masterWordPool.where((w) {
-      return !w['word']!.contains(targetLetter) &&
-          w['word'] != widget.letter.exampleWord;
-    }).toList();
-
-    validDistractors.shuffle();
-
-    // Pick top 3 distractors
-    List<Map<String, dynamic>> options = [];
-
-    // Add target word (Correct)
-    options.add({
-      'word': widget.letter.exampleWord,
-      'meaning': widget.letter.wordMeaning,
-      'isCorrect': true,
-    });
-
-    // Add 3 distractors
-    for (int i = 0; i < 3 && i < validDistractors.length; i++) {
-      options.add({
-        'word': validDistractors[i]['word']!,
-        'meaning': validDistractors[i]['meaning']!,
-        'isCorrect': false,
-      });
-    }
-
-    options.shuffle(); // Randomize order
-    quizOptions = options;
-  }
-
-  void _nextStage() {
+  void nextStage() {
     if (currentStage < 3) {
       setState(() {
         currentStage++;
-        if (currentStage == 1) {
-          _penAnimationController.reset();
-          _penAnimationController.forward();
-        }
       });
     } else {
-      widget.onComplete();
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🎉 ممتاز! أتممت إتقان الحرف بنجاح!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // إنهاء الحرف الحالي
+      if (!isFirstLetterCompleted && widget.letter2.isNotEmpty) {
+        setState(() {
+          isFirstLetterCompleted = true;
+          currentLetter = widget.letter2;
+          currentStage = 0; // العودة للمرحلة الأولى للحرف الثاني
+        });
+      } else {
+        // إنهاء المستوى
+        widget.onLevelComplete();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🎉 أحسنت! أكملت المستوى ${widget.levelNum} بنجاح!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Widget stageWidget;
+    switch (currentStage) {
+      case 0:
+        stageWidget = Stage1Listening(letter: currentLetter, onNext: nextStage);
+        break;
+      case 1:
+        stageWidget = Stage2Watching(letter: currentLetter, onNext: nextStage);
+        break;
+      case 2:
+        stageWidget = Stage3Writing(letter: currentLetter, onNext: nextStage);
+        break;
+      case 3:
+        stageWidget = Stage4Evaluation(letter: currentLetter, onNext: nextStage);
+        break;
+      default:
+        stageWidget = const SizedBox();
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('رحلة الحرف: ${widget.letter.symbol} (${widget.letter.name})'),
+        title: Text('تعلم الحرف: $currentLetter'),
         backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
       ),
-      body: Column(
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 500),
+        child: stageWidget,
+      ),
+    );
+  }
+}
+
+// --- المرحلة 1: الاستماع ---
+class Stage1Listening extends StatelessWidget {
+  final String letter;
+  final VoidCallback onNext;
+
+  const Stage1Listening({super.key, required this.letter, required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Stage Progress Indicator
+          const Text('استمع لصوت الحرف 🔊', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 40),
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            color: Colors.teal.shade100,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildProgressBadge(0, '🔊 الاستماع'),
-                _buildProgressBadge(1, '✍️ المشاهدة'),
-                _buildProgressBadge(2, '✏️ الكتابة'),
-                _buildProgressBadge(3, '🔍 التمييز'),
-              ],
+            padding: const EdgeInsets.all(40),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 10)],
             ),
+            child: Text(letter, style: const TextStyle(fontSize: 100, color: Colors.teal)),
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: _buildStageContent(),
-            ),
+          const SizedBox(height: 40),
+          ElevatedButton.icon(
+            onPressed: () {
+              // هنا يوضع كود تشغيل الصوت مستقبلاً
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تشغيل الصوت (تجريبي)')));
+            },
+            icon: const Icon(Icons.volume_up, size: 30),
+            label: const Text('استمع', style: TextStyle(fontSize: 20)),
+            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15)),
+          ),
+          const SizedBox(height: 40),
+          ElevatedButton(
+            onPressed: onNext,
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)),
+            child: const Text('التالي ➡️', style: TextStyle(fontSize: 20)),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildProgressBadge(int stageIndex, String title) {
-    final bool isActive = currentStage == stageIndex;
-    final bool isDone = currentStage > stageIndex;
+// --- المرحلة 2: المشاهدة (مع التصحيح البرمجي) ---
+class Stage2Watching extends StatefulWidget {
+  final String letter;
+  final VoidCallback onNext;
 
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: isDone
-              ? Colors.green
-              : (isActive ? Colors.teal : Colors.grey.shade300),
-          child: isDone
-              ? const Icon(Icons.check, color: Colors.white, size: 18)
-              : Text(
-                  '${stageIndex + 1}',
-                  style: TextStyle(
-                    color: isActive ? Colors.white : Colors.black,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: isActive ? Colors.teal.shade900 : Colors.black87,
-          ),
-        ),
-      ],
-    );
+  const Stage2Watching({super.key, required this.letter, required this.onNext});
+
+  @override
+  State<Stage2Watching> createState() => _Stage2WatchingState();
+}
+
+class _Stage2WatchingState extends State<Stage2Watching> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 3));
+    _controller.forward();
   }
 
-  Widget _buildStageContent() {
-    switch (currentStage) {
-      case 0:
-        return _buildStage0Listening();
-      case 1:
-        return _buildStage1AnimatedDrawing();
-      case 2:
-        return _buildStage2InteractiveWriting();
-      case 3:
-        return _buildStage3WordDiscrimination();
-      default:
-        return Container();
-    }
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
-  // STAGE 0: LISTENING
-  Widget _buildStage0Listening() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text(
-          'استمع إلى صوت الحرف جيداً:',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 30),
-        GestureDetector(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('🔊 صوت الحرف: ${widget.letter.name}'),
-                duration: const Duration(seconds: 1),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(40),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade300,
-              shape: BoxShape.circle,
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
-                )
-              ],
-            ),
-            child: Text(
-              widget.letter.symbol,
-              style: const TextStyle(
-                fontSize: 80,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        ElevatedButton.icon(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('🔊 تشغيل الصوت: ${widget.letter.name}'),
-                duration: const Duration(seconds: 1),
-              ),
-            );
-          },
-          icon: const Icon(Icons.volume_up, size: 28),
-          label: const Text('إعادة الاستماع للصوت', style: TextStyle(fontSize: 18)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.teal,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-        ),
-        const Spacer(),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: _nextStage,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-            child: const Text('المرحلة التالية ➔', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-        ),
-      ],
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    // مسار افتراضي بسيط للتجربة (يمكنك استبداله بمسارات الحروف الحقيقية)
+    Path dummyPath = Path()
+      ..moveTo(50, 50)
+      ..lineTo(150, 50)
+      ..lineTo(100, 150)
+      ..lineTo(50, 50);
 
-  // STAGE 1: ANIMATED WATCHING (PEN FOLLOWING PATH)
-  Widget _buildStage1AnimatedDrawing() {
-    return Column(
-      children: [
-        const Text(
-          'شاهد كيف يُرسم الحرف بالقلم (لاحظ نقطة البداية والنهاية):',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 20),
-        Expanded(
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.teal, width: 2),
-            ),
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('شاهد كيف يُرسم الحرف ✍️', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 40),
+          Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
             child: AnimatedBuilder(
-              animation: _penAnimationController,
+              animation: _controller,
               builder: (context, child) {
                 return CustomPaint(
                   painter: AnimatedPenPainter(
-                    points: widget.letter.pathPoints,
-                    progress: _penAnimationController.value,
+                    progress: _controller.value,
+                    letterPath: dummyPath,
                   ),
                 );
               },
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton.icon(
-              onPressed: () {
-                _penAnimationController.reset();
-                _penAnimationController.forward();
-              },
-              icon: const Icon(Icons.replay),
-              label: const Text('إعادة رسم الحرف القلم'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: _nextStage,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-            child: const Text('انتقل للتجربة بنفسك ➔', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // STAGE 2: INTERACTIVE WRITING (CANVAS WITH CLEAR / RETRY OPPORTUNITIES)
-  Widget _buildStage2InteractiveWriting() {
-    return Column(
-      children: [
-        const Text(
-          'تدرّب على رسم الحرف فوق الشكل الشفاف:',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.teal.shade300, width: 2),
-            ),
-            child: Stack(
-              children: [
-                // Background Guide Letter
-                Center(
-                  child: Text(
-                    widget.letter.symbol,
-                    style: TextStyle(
-                      fontSize: 220,
-                      color: Colors.grey.shade300,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                // User Touch Canvas
-                GestureDetector(
-                  onPanUpdate: (details) {
-                    RenderBox renderBox = context.findRenderObject() as RenderBox;
-                    setState(() {
-                      userDrawingPoints.add(renderBox.globalToLocal(details.globalPosition));
-                    });
-                  },
-                  onPanEnd: (details) {
-                    userDrawingPoints.add(null);
-                  },
-                  child: CustomPaint(
-                    painter: UserDrawingPainter(points: userDrawingPoints),
-                    size: Size.infinite,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            // Retry / Clear Button as requested
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  userDrawingPoints.clear();
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('تم المسح! حاول مرة أخرى بكل هدوء 👍'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.delete_sweep),
-              label: const Text('🗑️ مسح وإعادة المحاولة'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: userDrawingPoints.isNotEmpty
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('أحسنت! كتابة ممتازة ومطابقة!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  : null,
-              icon: const Icon(Icons.check),
-              label: const Text('تأكيد الرسم'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: userDrawingPoints.isNotEmpty ? _nextStage : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              disabledBackgroundColor: Colors.grey.shade300,
-            ),
-            child: const Text('مرحلة التقويم والتمييز ➔', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // STAGE 3: WORD DISCRIMINATION / QUIZ (EXACTLY 1 WORD HAS THE TARGET LETTER)
-  Widget _buildStage3WordDiscrimination() {
-    return Column(
-      children: [
-        Text(
-          'اختر الكلمة الوحيدة التي تحتوي على الحرف ( ${widget.letter.symbol} ):',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 20),
-        Expanded(
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 1.3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            itemCount: quizOptions.length,
-            itemBuilder: (context, index) {
-              final option = quizOptions[index];
-              final bool isSelected = selectedOptionIndex == index;
-
-              Color cardColor = Colors.white;
-              if (isSelected) {
-                cardColor = option['isCorrect']
-                    ? Colors.green.shade100
-                    : Colors.red.shade100;
-              }
-
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    selectedOptionIndex = index;
-                    isAnswerCorrect = option['isCorrect'];
-                  });
-
-                  if (option['isCorrect']) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('إجابة صحيحة برافو! 🌟'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('حاول مرة أخرى! هذه الكلمة لا تحتوي على الحرف المطلوبة.'),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
-                  }
+          const SizedBox(height: 40),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  _controller.reset();
+                  _controller.forward();
                 },
-                child: Card(
-                  elevation: 4,
-                  color: cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: isSelected
-                          ? (option['isCorrect'] ? Colors.green : Colors.red)
-                          : Colors.teal.shade200,
-                      width: 2,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        option['word'],
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '(${option['meaning']})',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: isAnswerCorrect ? _nextStage : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              disabledBackgroundColor: Colors.grey.shade300,
-            ),
-            child: const Text('إتمام الحرف والعودة للقائمة 🎉', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-        ),
-      ],
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة العرض'),
+              ),
+              const SizedBox(width: 20),
+              ElevatedButton(
+                onPressed: widget.onNext,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: const Text('التالي ➡️'),
+              ),
+            ],
+          )
+        ],
+      ),
     );
   }
 }
 
-// ==========================================
-// 4. CUSTOM PAINTERS (PEN & DRAWING)
-// ==========================================
-
+// --- الكلاس المصحح (AnimatedPenPainter) ---
 class AnimatedPenPainter extends CustomPainter {
-  final List<Offset> points;
   final double progress;
+  final Path letterPath;
 
-  AnimatedPenPainter({required this.points, required this.progress});
+  AnimatedPenPainter({required this.progress, required this.letterPath});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (points.isEmpty) return;
-
-    // Convert normalized points to canvas dimensions
-    List<Offset> scaledPoints = points.map((p) {
-      return Offset(p.dx * size.width, p.dy * size.height);
-    }).toList();
-
-    // 1. Draw guide full stroke (Light Gray)
+    // 🔴 تم التصحيح هنا: استخدام النقطتين المتتابعتين (..) بدلاً من النقطتين الرأسيتين (:)
     final Paint guidePaint = Paint()
-      :color = Colors.grey.shade300
+      ..color = Colors.grey.shade300
       ..strokeWidth = 12
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    Path fullPath = Path();
-    fullPath.moveTo(scaledPoints[0].dx, scaledPoints[0].dy);
-    for (int i = 1; i < scaledPoints.length; i++) {
-      fullPath.lineTo(scaledPoints[i].dx, scaledPoints[i].dy);
-    }
-    canvas.drawPath(fullPath, guidePaint);
-
-    // 2. Start & End Markers
-    final Paint startPaint = Paint()..color = Colors.green;
-    final Paint endPaint = Paint()..color = Colors.red;
-
-    canvas.drawCircle(scaledPoints.first, 12, startPaint);
-    canvas.drawCircle(scaledPoints.last, 12, endPaint);
-
-    // 3. Draw animated stroke progressively
-    final Paint activePaint = Paint()
+    final Paint drawPaint = Paint()
       ..color = Colors.teal
       ..strokeWidth = 12
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    Path animatedPath = Path();
-    animatedPath.moveTo(scaledPoints[0].dx, scaledPoints[0].dy);
+    // رسم المسار الباهت كدليل
+    canvas.drawPath(letterPath, guidePaint);
 
-    int totalSegments = scaledPoints.length - 1;
-    double currentProgress = progress * totalSegments;
-    int currentSegment = currentProgress.floor();
-    double segmentFactor = currentProgress - currentSegment;
-
-    for (int i = 0; i < currentSegment && i < totalSegments; i++) {
-      animatedPath.lineTo(scaledPoints[i + 1].dx, scaledPoints[i + 1].dy);
+    // رسم المسار المتحرك
+    ui.PathMetrics pathMetrics = letterPath.computeMetrics();
+    for (ui.PathMetric metric in pathMetrics) {
+      Path extractPath = metric.extractPath(0.0, metric.length * progress);
+      canvas.drawPath(extractPath, drawPaint);
+      
+      // رسم القلم (نقطة حمراء) في رأس المسار
+      if (progress > 0.0 && progress < 1.0) {
+        var metricData = metric.getTangentForOffset(metric.length * progress);
+        if (metricData != null) {
+          canvas.drawCircle(metricData.position, 10, Paint()..color = Colors.red);
+        }
+      }
     }
-
-    Offset currentPenPos = scaledPoints.first;
-
-    if (currentSegment < totalSegments) {
-      Offset p1 = scaledPoints[currentSegment];
-      Offset p2 = scaledPoints[currentSegment + 1];
-      currentPenPos = Offset(
-        p1.dx + (p2.dx - p1.dx) * segmentFactor,
-        p1.dy + (p2.dy - p1.dy) * segmentFactor,
-      );
-      animatedPath.lineTo(currentPenPos.dx, currentPenPos.dy);
-    } else {
-      currentPenPos = scaledPoints.last;
-    }
-
-    canvas.drawPath(animatedPath, activePaint);
-
-    // 4. Draw Animated Pen / Pencil Icon at moving point
-    final Paint penBodyPaint = Paint()..color = Colors.orange;
-    canvas.drawCircle(currentPenPos, 16, penBodyPaint);
-
-    TextPainter tp = TextPainter(
-      text: const TextSpan(
-        text: '✏️',
-        style: TextStyle(fontSize: 20),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    tp.layout();
-    tp.paint(
-      canvas,
-      Offset(currentPenPos.dx - 10, currentPenPos.dy - 12),
-    );
   }
 
   @override
@@ -1298,17 +409,93 @@ class AnimatedPenPainter extends CustomPainter {
   }
 }
 
-class UserDrawingPainter extends CustomPainter {
-  final List<Offset?> points;
+// --- المرحلة 3: الكتابة الحرّة (مع زر المسح) ---
+class Stage3Writing extends StatefulWidget {
+  final String letter;
+  final VoidCallback onNext;
 
-  UserDrawingPainter({required this.points});
+  const Stage3Writing({super.key, required this.letter, required this.onNext});
+
+  @override
+  State<Stage3Writing> createState() => _Stage3WritingState();
+}
+
+class _Stage3WritingState extends State<Stage3Writing> {
+  List<Offset?> points = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('ارسم الحرف بإصبعك ✏️', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Container(
+            width: 300,
+            height: 300,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: Colors.teal, width: 2),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // الحرف الباهت في الخلفية
+                Text(widget.letter, style: TextStyle(fontSize: 200, color: Colors.grey.shade200)),
+                // مساحة الرسم
+                GestureDetector(
+                  onPanUpdate: (details) {
+                    setState(() {
+                      RenderBox renderBox = context.findRenderObject() as RenderBox;
+                      points.add(renderBox.globalToLocal(details.globalPosition));
+                    });
+                  },
+                  onPanEnd: (details) => setState(() => points.add(null)),
+                  child: CustomPaint(
+                    painter: DrawingPainter(points: points),
+                    size: Size.infinite,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => setState(() => points.clear()),
+                icon: const Icon(Icons.delete),
+                label: const Text('مسح 🗑️'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              ),
+              const SizedBox(width: 20),
+              ElevatedButton.icon(
+                onPressed: widget.onNext,
+                icon: const Icon(Icons.check),
+                label: const Text('تأكيد ✅'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+}
+
+class DrawingPainter extends CustomPainter {
+  final List<Offset?> points;
+  DrawingPainter({required this.points});
 
   @override
   void paint(Canvas canvas, Size size) {
     Paint paint = Paint()
-      ..color = Colors.deepOrange
-      ..strokeCap = StrokeCap.round;
-      strokeWidth: 10.0;
+      ..color = Colors.teal
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 10.0;
 
     for (int i = 0; i < points.length - 1; i++) {
       if (points[i] != null && points[i + 1] != null) {
@@ -1318,7 +505,102 @@ class UserDrawingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant UserDrawingPainter oldDelegate) {
-    return oldDelegate.points != points;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// --- المرحلة 4: التقويم (كلمة واحدة صحيحة) ---
+class Stage4Evaluation extends StatefulWidget {
+  final String letter;
+  final VoidCallback onNext;
+
+  const Stage4Evaluation({super.key, required this.letter, required this.onNext});
+
+  @override
+  State<Stage4Evaluation> createState() => _Stage4EvaluationState();
+}
+
+class _Stage4EvaluationState extends State<Stage4Evaluation> {
+  List<String> options = [];
+  String? selectedWord;
+  bool? isCorrect;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateOptions();
+  }
+
+  void _generateOptions() {
+    // 1. جلب الكلمات التي تحتوي على الحرف
+    List<String> correctWords = dictionary.where((w) => w.contains(widget.letter)).toList();
+    // 2. جلب الكلمات التي لا تحتوي على الحرف
+    List<String> incorrectWords = dictionary.where((w) => !w.contains(widget.letter)).toList();
+
+    String correctWord = correctWords.isNotEmpty ? correctWords[Random().nextInt(correctWords.length)] : widget.letter + 'ⴰⵎⴰⵏ';
+    incorrectWords.shuffle();
+    List<String> chosenIncorrect = incorrectWords.take(3).toList();
+
+    options = [correctWord, ...chosenIncorrect];
+    options.shuffle();
+  }
+
+  void _checkAnswer(String word) {
+    setState(() {
+      selectedWord = word;
+      isCorrect = word.contains(widget.letter);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text('أين يوجد الحرف [ ${widget.letter} ] ؟ 🔍', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 30),
+          Wrap(
+            spacing: 20,
+            runSpacing: 20,
+            alignment: WrapAlignment.center,
+            children: options.map((word) {
+              bool isSelected = selectedWord == word;
+              Color cardColor = Colors.white;
+              if (isSelected) {
+                cardColor = isCorrect! ? Colors.green.shade200 : Colors.red.shade200;
+              }
+
+              return GestureDetector(
+                onTap: selectedWord == null ? () => _checkAnswer(word) : null,
+                child: Container(
+                  width: 150,
+                  height: 100,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.teal, width: 2),
+                  ),
+                  child: Text(word, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 40),
+          if (isCorrect == true)
+            ElevatedButton(
+              onPressed: widget.onNext,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)),
+              child: const Text('ممتاز! استمر 🌟', style: TextStyle(fontSize: 20)),
+            ),
+          if (isCorrect == false)
+            ElevatedButton(
+              onPressed: () => setState(() { selectedWord = null; isCorrect = null; }),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('حاول مرة أخرى 🔄'),
+            ),
+        ],
+      ),
+    );
   }
 }
